@@ -56,13 +56,18 @@ class ObstacleEnvironment2D:
         '''
         return (A_MATS, B_MATS)
 
-    def plot_path(self, waypoints):
+    def plot_path(self, ax, waypoints):
         '''
 
         :param waypoints: List of 2D np.array()
         :return:
         '''
         # TODO: Given set of waypoints plot a path
+        for value in waypoints:
+            if len(value) == 2:
+                ax.plot(value[0], value[1], 'bo')
+            else:
+                ax.arrow(value[0], value[1], value[2], value[3], width=1, length_includes_head=True)
         pass
 
     def plot(self):
@@ -79,8 +84,15 @@ class ObstacleEnvironment2D:
         ax.add_collection(lc)
         ax.add_artist(start_circ)
         ax.add_artist(end_circ)
+        ######
+        test = np.array([[30, 50], [30, 50, 40, 30], [70, 80], [70, 80, -10, 7]])
+        self.plot_path(ax, test)
+        ######
         plt.show()
         pass
 
 
 START_ENV = ObstacleEnvironment2D(START, END, OBSTACLES, CVX_LINES)
+START_ENV.plot()
+
+
