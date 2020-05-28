@@ -9,8 +9,8 @@ BLUE = np.array([0, 0, 1, 1])
 GREEN = np.array([0, 1, 0, 1])
 BLACK = np.array([0, 0, 0, 1])
 
-START = (5, 5)
-END = (90, 90)
+START = (5, 5, 50, 0)
+END = (90, 90, 0, 0)
 # these are assumed so don't pass them in CVX_INEQS
 OUTERBOUNDS = [
     [(0, 0), (0, 100)],
@@ -85,8 +85,8 @@ class ObstacleEnvironment2D:
                  [RED] * len(self.obstacles) + \
                  [BLUE] * len(self.cvx_regions)
         lc = mc.LineCollection(lines, colors=colors, linewidths=2)
-        start_circ = plt.Circle(self.end, 2, color='g')
-        end_circ = plt.Circle(self.start, 2, color='r')
+        start_circ = plt.Circle(self.end[:2], 2, color='g')
+        end_circ = plt.Circle(self.start[:2], 2, color='r')
         fig, ax = plt.subplots()
         ax.set_xlim(-20, 120)
         ax.set_ylim(-20, 120)
