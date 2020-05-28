@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+from numpy.linalg import norm
 from matplotlib import collections as mc
 
 # Constants I will use testing
@@ -56,21 +57,29 @@ class ObstacleEnvironment2D:
         '''
         return (A_MATS, B_MATS)
 
-    def plot_path(self, ax, waypoints):
+    def plot_path(self, waypoints, ax=None):
         '''
 
+        :param ax:
         :param waypoints: List of 2D np.array()
         :return:
         '''
         # TODO: Given set of waypoints plot a path
+        if ax is None:
+            ax = self.plot(False)
+
         for value in waypoints:
             if len(value) == 2:
                 ax.plot(value[0], value[1], 'bo')
             else:
-                ax.arrow(value[0], value[1], value[2], value[3], width=1, length_includes_head=True)
-        pass
+                vnorm = norm((value[2], value[3]))
+                vnorm = vnorm if vnorm > 0 else 1
+                ax.arrow(value[0], value[1], value[2]/vnorm, value[3]/vnorm,
+                         width=0.5,
+                         length_includes_head=True)
+        return ax
 
-    def plot(self):
+    def plot(self, show=True):
         lines = OUTERBOUNDS + self.obstacles + self.cvx_regions
         colors = [BLACK] * len(OUTERBOUNDS) + \
                  [RED] * len(self.obstacles) + \
@@ -79,20 +88,17 @@ class ObstacleEnvironment2D:
         start_circ = plt.Circle(self.end, 2, color='g')
         end_circ = plt.Circle(self.start, 2, color='r')
         fig, ax = plt.subplots()
-        ax.set_xlim(-1, 101)
-        ax.set_ylim(-1, 101)
+        ax.set_xlim(-20, 120)
+        ax.set_ylim(-20, 120)
         ax.add_collection(lc)
         ax.add_artist(start_circ)
         ax.add_artist(end_circ)
         ######
-        test = np.array([[30, 50], [30, 50, 40, 30], [70, 80], [70, 80, -10, 7]])
-        self.plot_path(ax, test)
+
         ######
-        plt.show()
-        pass
+        if show:
+            plt.show()
+        return ax
 
 
 START_ENV = ObstacleEnvironment2D(START, END, OBSTACLES, CVX_LINES)
-START_ENV.plot()
-
-

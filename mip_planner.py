@@ -1,4 +1,21 @@
 import numpy as np
+from obstacle_environment import ObstacleEnvironment2D
+from core.dynamics.linear_system_dynamics import LinearSystemDynamics
+import gurobipy
+
+TESTA = np.array([
+    [0, 0, 1, 0],
+    [0, 0, 0, 1],
+    [-1, 0, 0, 0],
+    [0, 1, 0, 0],
+])
+
+TESTB = np.array([
+    [0, 0],
+    [0, 0],
+    [1, 0],
+    [0, 1]
+])
 
 
 class MIPPlanner:
