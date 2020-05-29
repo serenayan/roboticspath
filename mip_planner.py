@@ -41,7 +41,8 @@ class MIPPlanner:
         '''
         return {1: np.zeros([2]), 2: np.ones([2])}
 
-    def optimize_path(self, active_set=[], initial_soln=None, verbose=False):
+    def optimize_path(self, active_set=None, inactive_set_val=None,
+                      initial_soln=None, verbose=False):
         '''
 
         :param initial_soln: Initial guess for solution to optimization problem
@@ -53,6 +54,13 @@ class MIPPlanner:
         m = gp.Model('Planner')
         x, u, q, cvx_constraints, dyn_constraints \
             = (list(), list(), list(), list(), list())
+        if active_set is not None:
+            assert active_set.dtype == bool, "active set must be np array of bools"
+        else:
+            active_set = np.ones((self.T, len(self.env.get_cvx_ineqs()[0])),
+                                 dtype=bool)
+        if inactive_set_val is not None:
+            assert inactive_set_val.dtype == bool, "inactive_set_value must be bools"
 
         for t in range(self.T):
             x.append(m.addMVar(4, lb=-GRB.INFINITY,
@@ -62,15 +70,35 @@ class MIPPlanner:
                                vtype=GRB.CONTINUOUS,
                                name=f"u_{t}"))
             q.append(x[-1][:2])
+            # THis wont work in general it has to be specified as part of
+            #one cnvex region in the environment
+            # q[-1].setAttr("lb", 0.0)
+            # q[-1].setAttr("ub", 100.0)
+            # m.addConstr(q[-1] <= 100*np.ones((2,)))
             xbinvars, x_row_constraints = (list(), list())
+            const_constraints = list()
+            assert np.any(active_set[t]) or np.any(inactive_set_val[t]),\
+            "[ERROR] Inconsistent problem definition. Each waypoint must have " \
+            "at least one convex region constraint active."
+
             for region_idx_ in range(self.num_regions):
-                bin_var, row_constraints = self._add_cvx_region_constraint(
-                    q[-1], region_idx_, t, m)
-                xbinvars.append(bin_var)
-                x_row_constraints.append(row_constraints)
-            anycvx = m.addConstr(gp.quicksum(xbinvars) >= 1,
-                                 name=f"x_{t}_cvx_any")
-            cvx_constraints.append((xbinvars, x_row_constraints, anycvx))
+                if active_set[t, region_idx_]:
+                    bin_var, row_constraints = self._add_cvx_region_constraint(
+                        q[-1], region_idx_, t, m)
+                    xbinvars.append(bin_var)
+                    x_row_constraints.append(row_constraints)
+                else:
+                    if inactive_set_val[t, region_idx_]:
+
+                        const_constraints.append(
+                            self._add_cvx_region_constant_constraint(
+                                q[-1], region_idx_, t, m))
+            if len(const_constraints) == 0 and len(xbinvars) > 0:
+                anycvx = m.addConstr(gp.quicksum(xbinvars) >= 1,
+                                     name=f"x_{t}_cvx_any")
+                cvx_constraints.append((xbinvars, x_row_constraints, None, anycvx))
+            else:
+                cvx_constraints.append((xbinvars, x_row_constraints, const_constraints, None))
         init_constraint = m.addMConstrs(
             A=np.eye(4),
             x=x[0],
@@ -93,13 +121,22 @@ class MIPPlanner:
         m.setObjective(sum([ut @ np.eye(2) @ ut for ut in u]), GRB.MINIMIZE)
 
         m.optimize()
-
+        if m.getAttr('Status') == GRB.INFEASIBLE :
+            print('[WARNING] Model provided is infeasible. CVX regions '
+                  'probably wron.')
+        elif m.getAttr('Status') == GRB.INF_OR_UNB:
+            assert False, "[ERROR] Should never happen.]"
         self.last_x = x
         self.last_u = u
         self.last_m = m
+
         xnp = [xt.getAttr('X') for xt in x]
         unp = [ut.getAttr('X') for ut in u]
         return xnp, unp
+    def _add_cvx_region_constant_constraint(self, qt, region_idx, t, model):
+        Ai = self.AbCvx[region_idx][0]
+        bi = self.AbCvx[region_idx][1].squeeze()
+        return model.addConstr(Ai@qt <= bi, name=f"x_{t}_cvx_{region_idx}_FON")
 
     def _add_cvx_region_constraint(self, qt, region_idx, t, model):
         Ai = self.AbCvx[region_idx][0]
