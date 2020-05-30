@@ -124,7 +124,7 @@ class MIPPlanner:
         if m.getAttr('Status') == GRB.INFEASIBLE :
             print('[WARNING] Model provided is infeasible. CVX regions '
                   'probably wron.')
-        elif m.getAttr('Status') == GRB.INF_OR_UNB:
+        elif m.getAttr('Status') == GRB.INF_OR_UNBD:
             assert False, "[ERROR] Should never happen.]"
         self.last_x = x
         self.last_u = u
