@@ -109,6 +109,8 @@ def point_within_bounds(sol, x_bounds, y_bounds, line_a=None):
 
 def plot_region(ax, pt1, pt2, x_bounds, y_bounds, line_color):
     const, pts = gen_triangle_2_points(pt1[0], pt1[1], pt2[0], pt2[1], x_bounds, y_bounds)
+    if len(const) != len(pts):
+        print("Potential bug detected. Re-generation advised.")
     points = np.random.rand(len(pts), 2)
     for pos1 in range(0, len(points)):
         for pos2 in range(0, len(points[0])):
