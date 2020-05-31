@@ -207,13 +207,13 @@ def load_data(path):
     return data
 
 
-def load_folder_and_plot(start, end, folder, x_bounds, y_bounds):
+def load_folder_and_plot(ax, start, end, folder, x_bounds, y_bounds):
     a_mats = load_data(folder + "/a")
     b_mats = load_data(folder + "/b")
     pts = load_data(folder + "/pts")
     for points in pts:
         hull = ConvexHull(points)
-        plt.fill(points[hull.vertices, 0], points[hull.vertices, 1], 'lime', alpha=1)
+        ax.fill(points[hull.vertices, 0], points[hull.vertices, 1], 'lime', alpha=1)
     for pos in range(0, len(a_mats)):
         a_mat = a_mats[pos]
         b_mat = b_mats[pos]
@@ -225,12 +225,11 @@ def load_folder_and_plot(start, end, folder, x_bounds, y_bounds):
             for val in x:
                 y.append(float(-a[0] * val + b) / a[1])
             y = np.array(y)
-            plt.plot(x, y, c="black")
-    plt.plot(start[0], start[1], "bo")
-    plt.plot(end[0], end[1], "bo")
-    plt.xlim(x_bounds[0], x_bounds[1])
-    plt.ylim(y_bounds[0], y_bounds[1])
-    plt.show()
+            ax.plot(x, y, c="black")
+    ax.plot(start[0], start[1], "bo")
+    ax.plot(end[0], end[1], "bo")
+    ax.set_xlim(x_bounds[0], x_bounds[1])
+    ax.set_ylim(y_bounds[0], y_bounds[1])
 
 
 if __name__ == "__main__":
@@ -238,5 +237,8 @@ if __name__ == "__main__":
     e = (90, 90)
     x_b = (0, 100)
     y_b = (0, 100)
-    #gen_plot_write(s, e, "out", x_b, y_b)
-    #load_folder_and_plot(s, e, "out", x_b, y_b)
+    #gen_plot_write(s, e, "out", x_b, y_b)  # generate and write
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    load_folder_and_plot(ax, s, e, "out", x_b, y_b)  # read and plot
+    fig.show()
