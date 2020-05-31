@@ -55,35 +55,55 @@ def gen_triangle_2_points(x1, y1, x2, y2, x_bounds, y_bounds):
 
 
 def determine_constraint(a1, b1, a2, b2, line_a, line_b, x_bounds, y_bounds, constraints,  points):
+    added = False
     int1 = tuple(np.linalg.solve(np.array([a1, line_a]), np.array([b1, line_b])))
     int2 = tuple(np.linalg.solve(np.array([a2, line_a]), np.array([b2, line_b])))
-    if point_within_bounds(int1, x_bounds, y_bounds) and int1 not in points:
+    within1 = point_within_bounds(int1, x_bounds, y_bounds, line_a=line_a)
+    within2 = point_within_bounds(int2, x_bounds, y_bounds, line_a=line_a)
+    if within1 and int1 not in points:
         points.append(int1)
-    if point_within_bounds(int2, x_bounds, y_bounds) and int2 not in points:
+    if within2 and int2 not in points:
         points.append(int2)
-    if point_within_bounds(int1, x_bounds, y_bounds) or point_within_bounds(int2, x_bounds, y_bounds):
+    if within1 or within2:
         eqn = (line_a, line_b)
         if eqn not in constraints:
             constraints.append(eqn)
-    return constraints, points
+            added = True
+    return constraints, points, added
 
 
 def check_lines_against_bounds(a1, b1, a2, b2, x_bounds, y_bounds, constrs, pts):
     sol = tuple(np.linalg.solve(np.array([a1, a2]), np.array([b1, b2])))
     if point_within_bounds(sol, x_bounds, y_bounds):
         pts.append(sol)
+    ints = []
     if sol[0] < x_bounds[0]:
-        constrs, pts = determine_constraint(a1, b1, a2, b2, [-1, 0], -x_bounds[0], x_bounds, y_bounds, constrs, pts)
+        constrs, pts, add = determine_constraint(a1, b1, a2, b2, [-1, 0], -x_bounds[0], x_bounds, y_bounds, constrs, pts)
+        if add:
+            ints.append(x_bounds[0])
     elif sol[0] > x_bounds[1]:
-        constrs, pts = determine_constraint(a1, b1, a2, b2, [1, 0], x_bounds[1], x_bounds, y_bounds, constrs, pts)
+        constrs, pts, add = determine_constraint(a1, b1, a2, b2, [1, 0], x_bounds[1], x_bounds, y_bounds, constrs, pts)
+        if add:
+            ints.append(x_bounds[1])
     if sol[1] < y_bounds[0]:
-        constrs, pts = determine_constraint(a1, b1, a2, b2, [0, -1], -y_bounds[0], x_bounds, y_bounds, constrs, pts)
+        constrs, pts, add = determine_constraint(a1, b1, a2, b2, [0, -1], -y_bounds[0], x_bounds, y_bounds, constrs, pts)
+        if add:
+            ints.append(y_bounds[0])
     elif sol[1] > y_bounds[1]:
-        constrs, pts = determine_constraint(a1, b1, a2, b2, [0, 1], y_bounds[1], x_bounds, y_bounds, constrs, pts)
+        constrs, pts, add = determine_constraint(a1, b1, a2, b2, [0, 1], y_bounds[1], x_bounds, y_bounds, constrs, pts)
+        if add:
+            ints.append(y_bounds[1])
+    if len(ints) == 2:
+        pts.append(tuple(ints))
     return constrs, pts
 
 
-def point_within_bounds(sol, x_bounds, y_bounds):
+def point_within_bounds(sol, x_bounds, y_bounds, line_a=None):
+    if line_a and len(line_a) == 2:
+        if line_a[0] == 0:
+            return x_bounds[0] <= sol[0] <= x_bounds[1]
+        if line_a[1] == 0:
+            return y_bounds[0] <= sol[1] <= y_bounds[1]
     return (x_bounds[0] <= sol[0] <= x_bounds[1]) and (y_bounds[0] <= sol[1] <= y_bounds[1])
 
 
@@ -94,7 +114,7 @@ def plot_region(ax, pt1, pt2, x_bounds, y_bounds, line_color):
         for pos2 in range(0, len(points[0])):
             points[pos1][pos2] = pts[pos1][pos2]
     hull = ConvexHull(points)
-    plt.fill(points[hull.vertices, 0], points[hull.vertices, 1], 'lime', alpha=1)
+    ax.fill(points[hull.vertices, 0], points[hull.vertices, 1], 'lime', alpha=1)
     #ax.plot(pt1[0], pt1[1], 'bo')
     #ax.plot(pt2[0], pt2[1], 'bo')
     for pos in range(0, 3):
@@ -106,7 +126,7 @@ def plot_region(ax, pt1, pt2, x_bounds, y_bounds, line_color):
         for val in x:
             y.append(float(-a[0]*val + b)/a[1])
         y = np.array(y)
-        plt.plot(x, y, c=line_color)
+        ax.plot(x, y, c=line_color)
     ax.set_xlim(x_bounds[0], x_bounds[1])
     ax.set_ylim(y_bounds[0], y_bounds[1])
     return convert_constraints(const)
