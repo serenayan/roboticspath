@@ -2,6 +2,8 @@ import numpy as np
 import random
 import matplotlib.pyplot as plt
 from scipy.spatial import ConvexHull
+import pickle
+import os
 
 
 def gen_line_2_points(x1, y1, x2=None, y2=None, rise=None, run=None, rev=False):
@@ -131,7 +133,8 @@ def plot_region(ax, pt1, pt2, x_bounds, y_bounds, line_color):
         ax.plot(x, y, c=line_color)
     ax.set_xlim(x_bounds[0], x_bounds[1])
     ax.set_ylim(y_bounds[0], y_bounds[1])
-    return convert_constraints(const)
+    a_mat, b_mat = convert_constraints(const)
+    return a_mat, b_mat, points
 
 
 def gen_point_queue(num_int_points, start, end, x_bounds, y_bounds):
@@ -156,20 +159,84 @@ def convert_constraints(const):
     return np.array(a_mat), np.array(b_mat)
 
 
-if __name__ == "__main__":
-    start = (10, 10)
-    end = (90, 90)
+def gen_plot_write(start, end, folder, x_bounds, y_bounds): #folder will be created if it does not exist
     a_mats = []
     b_mats = []
+    pts = []
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    q = gen_point_queue(4, start, end, (0, 100), (0, 100))
+    q = gen_point_queue(4, start, end, x_bounds, y_bounds)
     for pos in range(0, len(q) - 1):
-        a, b, = plot_region(ax, q[pos], q[pos+1], (0, 100), (0, 100), line_color="black")
+        a, b, p = plot_region(ax, q[pos], q[pos+1], x_bounds, y_bounds, line_color="black")
         a_mats.append(a)
         b_mats.append(b)
+        pts.append(p)
     ax.plot(start[0], start[1], 'bo')
     ax.plot(end[0], end[1], 'bo')
     fig.show()
+    print(pts)
     print(a_mats)
     print(b_mats)
+    bug = False
+    for pos in range(0, len(pts)):
+        if len(pts[pos]) != len(a_mats[pos]):
+            bug = True
+            print("Buggy generation. Bypassing save")
+    if not bug:
+        inval = ""
+        while inval != "1" and inval != "2":
+            inval = input("Press 1 to save or 2 to discard. Then press enter")
+        if inval == "1":
+            if not os.path.isdir(folder):
+                os.makedirs(folder)
+            write_to_file(folder + "/a", a_mats)
+            write_to_file(folder + "/b", b_mats)
+            write_to_file(folder + "/pts", pts)
+
+
+def write_to_file(path, data):
+    file = open(path, 'wb')
+    pickle.dump(data, file)
+    file.close()
+
+
+def load_data(path):
+    file = open(path, 'rb')
+    data = pickle.load(file)
+    file.close()
+    return data
+
+
+def load_folder_and_plot(start, end, folder, x_bounds, y_bounds):
+    a_mats = load_data(folder + "/a")
+    b_mats = load_data(folder + "/b")
+    pts = load_data(folder + "/pts")
+    for points in pts:
+        hull = ConvexHull(points)
+        plt.fill(points[hull.vertices, 0], points[hull.vertices, 1], 'lime', alpha=1)
+    for pos in range(0, len(a_mats)):
+        a_mat = a_mats[pos]
+        b_mat = b_mats[pos]
+        for pos2 in range(0, len(a_mat)):
+            a = a_mat[pos2]
+            b = b_mat[pos2]
+            x = np.arange(0, 101)
+            y = []
+            for val in x:
+                y.append(float(-a[0] * val + b) / a[1])
+            y = np.array(y)
+            plt.plot(x, y, c="black")
+    plt.plot(start[0], start[1], "bo")
+    plt.plot(end[0], end[1], "bo")
+    plt.xlim(x_bounds[0], x_bounds[1])
+    plt.ylim(y_bounds[0], y_bounds[1])
+    plt.show()
+
+
+if __name__ == "__main__":
+    s = (10, 10)
+    e = (90, 90)
+    x_b = (0, 100)
+    y_b = (0, 100)
+    #gen_plot_write(s, e, "out", x_b, y_b)
+    #load_folder_and_plot(s, e, "out", x_b, y_b)
