@@ -230,6 +230,7 @@ def load_folder_and_plot(ax, start, end, folder, x_bounds, y_bounds):
     ax.plot(end[0], end[1], "bo")
     ax.set_xlim(x_bounds[0], x_bounds[1])
     ax.set_ylim(y_bounds[0], y_bounds[1])
+    return a_mats, b_mats
 
 
 if __name__ == "__main__":
@@ -240,5 +241,7 @@ if __name__ == "__main__":
     #gen_plot_write(s, e, "out", x_b, y_b)  # generate and write
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    load_folder_and_plot(ax, s, e, "out", x_b, y_b)  # read and plot
+    a, b = load_folder_and_plot(ax, s, e, "out", x_b, y_b)  # read and plot
     fig.show()
+    print(a)
+    print(b)
