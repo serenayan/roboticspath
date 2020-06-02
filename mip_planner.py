@@ -1,3 +1,4 @@
+# from pyping.core import *
 import numpy as np
 from obstacle_environment import ObstacleEnvironment2D
 from core.dynamics.linear_system_dynamics import LinearSystemDynamics
