@@ -32,6 +32,7 @@ class MIPPlanner:
         self.last_m = None
         self.AbCvx = [(a, b) for a, b in zip(*self.env.get_cvx_ineqs())]
         self.num_regions = len(self.AbCvx)
+        self.time_limit = float('inf')
 
     def get_discrete_variables(self):
         '''
@@ -40,6 +41,9 @@ class MIPPlanner:
         :return: List of dictionary of discrete variables
         '''
         return {1: np.zeros([2]), 2: np.ones([2])}
+
+    def set_optim_timelimit(self, seconds):
+        self.time_limit = seconds
 
     def optimize_path(self, active_set=None, inactive_set_val=None,
                       initial_soln=None, verbose=False):
@@ -52,6 +56,7 @@ class MIPPlanner:
         :return: Waypoints corresponding to path
         '''
         m = gp.Model('Planner')
+        m.Params.timeLimit = self.time_limit
         x, u, q, cvx_constraints, dyn_constraints \
             = (list(), list(), list(), list(), list())
         if active_set is not None:
@@ -121,18 +126,22 @@ class MIPPlanner:
         m.setObjective(sum([ut @ np.eye(2) @ ut for ut in u]), GRB.MINIMIZE)
 
         m.optimize()
-        if m.getAttr('Status') == GRB.INFEASIBLE :
+        if m.getAttr('Status') == GRB.INFEASIBLE:
             print('[WARNING] Model provided is infeasible. CVX regions '
-                  'probably wron.')
+                  'probably wrong.')
         elif m.getAttr('Status') == GRB.INF_OR_UNBD:
-            assert False, "[ERROR] Should never happen.]"
+            assert False, "[ERROR] Should never happen."
+        elif m.getAttr('Status') == GRB.TIME_LIMIT:
+            print('[INFO] MIP time-limit termination.')
+
         self.last_x = x
         self.last_u = u
         self.last_m = m
-
+        runtime = m.getAttr('Runtime')
         xnp = [xt.getAttr('X') for xt in x]
         unp = [ut.getAttr('X') for ut in u]
-        return xnp, unp
+        return xnp, unp, runtime
+
     def _add_cvx_region_constant_constraint(self, qt, region_idx, t, model):
         Ai = self.AbCvx[region_idx][0]
         bi = self.AbCvx[region_idx][1].squeeze()

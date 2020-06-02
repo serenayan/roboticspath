@@ -25,7 +25,7 @@ def test_mip_planner():
     planner = MIPPlanner(START_ENV, LinearSystemDynamics(TESTA, TESTB),
                          T=200,
                          h_k=0.001)
-    x, u = planner.optimize_path()
+    x, u, _ = planner.optimize_path()
 
     np.testing.assert_allclose(x[0], START_ENV.start)
     np.testing.assert_allclose(x[-1], START_ENV.end)
@@ -47,7 +47,7 @@ def test_mip_discrete_regions():
     active_set[120:, 3] = True
     active_set_vals = active_set
 
-    x, u = planner.optimize_path(active_set, active_set_vals)
+    x, u, rt = planner.optimize_path(active_set, active_set_vals)
     np.testing.assert_allclose(x[0], START_ENV.start)
     np.testing.assert_allclose(x[-1], START_ENV.end)
     assert x[90][0] < 10 and x[90][1] > 80 # top left corner
