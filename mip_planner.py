@@ -22,7 +22,8 @@ TESTB = np.array([
 class MIPPlanner:
 
     def __init__(self, env: ObstacleEnvironment2D, dyn,
-                 T=200, h_k=1e-3):
+                 T=200, h_k=1e-3, presolve=0):
+        self.presolve = presolve # 1 low 2 high ; higher = faster but more aggresive
         self.env = env
         self.dyn = dyn
         self.T = T
@@ -61,11 +62,15 @@ class MIPPlanner:
             = (list(), list(), list(), list(), list())
         if active_set is not None:
             assert active_set.dtype == bool, "active set must be np array of bools"
+            active_set = active_set.copy() #we change this later so make a copy
         else:
             active_set = np.ones((self.T, len(self.env.get_cvx_ineqs()[0])),
                                  dtype=bool)
         if inactive_set_val is not None:
             assert inactive_set_val.dtype == bool, "inactive_set_value must be bools"
+            inactive_set_val.copy() #we change this later so make a copy
+        else:
+            inactive_set_val = active_set.copy()
 
         for t in range(self.T):
             x.append(m.addMVar(4, lb=-GRB.INFINITY,
@@ -87,33 +92,29 @@ class MIPPlanner:
             "at least one convex region constraint active."
 
             for region_idx_ in range(self.num_regions):
-                if active_set[t, region_idx_]:
-                    bin_var, row_constraints = self._add_cvx_region_constraint(
-                        q[-1], region_idx_, t, m)
-                    xbinvars.append(bin_var)
-                    x_row_constraints.append(row_constraints)
-                else:
-                    if inactive_set_val[t, region_idx_]:
-
-                        const_constraints.append(
-                            self._add_cvx_region_constant_constraint(
-                                q[-1], region_idx_, t, m))
-            if len(const_constraints) == 0 and len(xbinvars) > 0:
-                anycvx = m.addConstr(gp.quicksum(xbinvars) >= 1,
-                                     name=f"x_{t}_cvx_any")
-                cvx_constraints.append((xbinvars, x_row_constraints, None, anycvx))
-            else:
-                cvx_constraints.append((xbinvars, x_row_constraints, const_constraints, None))
+                bin_var, row_constraints = self._add_cvx_region_constraint(
+                    q[-1], region_idx_, t, m)
+                xbinvars.append(bin_var)
+                x_row_constraints.append(row_constraints)
+                if not active_set[t, region_idx_]:
+                    const_constraints.append(
+                        m.addConstr(bin_var == inactive_set_val[t, region_idx_],
+                                    name=f"x_{t}_cvx_{region_idx_}_FON"))
+            anycvx = m.addConstr(gp.quicksum(xbinvars) >= 1,
+                                 name=f"x_{t}_cvx_any")
+            cvx_constraints.append((xbinvars, x_row_constraints, const_constraints, anycvx))
         init_constraint = m.addMConstrs(
             A=np.eye(4),
             x=x[0],
             sense=GRB.EQUAL,
-            b=np.array(self.env.start))
+            b=np.array(self.env.start),
+            name='x_init')
         end_constraint = m.addMConstrs(
             A=np.eye(4),
             x=x[-1],
             sense=GRB.EQUAL,
-            b=np.array(self.env.end))
+            b=np.array(self.env.end),
+            name='x_f')
 
         for t in range(self.T - 1):
             dyn_constraints.append(
@@ -121,10 +122,14 @@ class MIPPlanner:
                     x[t + 1] - x[t] == \
                     0.5 * self.h_k * ( \
                             (self.dyn.A @ x[t] + self.dyn.A @ x[t + 1]) + \
-                            (self.dyn.B @ u[t] + self.dyn.B @ u[t + 1]))))
+                            (self.dyn.B @ u[t] + self.dyn.B @ u[t + 1])),
+                    name=f'dyn_{t}'))
 
         m.setObjective(sum([ut @ np.eye(2) @ ut for ut in u]), GRB.MINIMIZE)
-
+        if initial_soln is not None:
+            (x_init, u_init)= initial_soln
+            self._initialize_variables(x, u, x_init, u_init)
+        m.Params.Presolve = self.presolve
         m.optimize()
         if m.getAttr('Status') == GRB.INFEASIBLE:
             print('[WARNING] Model provided is infeasible. CVX regions '
@@ -134,13 +139,29 @@ class MIPPlanner:
         elif m.getAttr('Status') == GRB.TIME_LIMIT:
             print('[INFO] MIP time-limit termination.')
 
+        self._update_active_set(active_set,
+                                inactive_set_val,
+                                [c[0] for c in cvx_constraints])
+
         self.last_x = x
         self.last_u = u
         self.last_m = m
         runtime = m.getAttr('Runtime')
         xnp = [xt.getAttr('X') for xt in x]
         unp = [ut.getAttr('X') for ut in u]
-        return xnp, unp, runtime
+        objective = m.getObjective().getValue()
+        return xnp, unp, objective, active_set, inactive_set_val, runtime
+
+    def _initialize_variables(self, x, u, x_init, u_init):
+        for t in range(self.T):
+            x[t].setAttr('Start', x_init[t])
+            u[t].setAttr('Start', u_init[t])
+
+    def _update_active_set(self, active_set, inactive_set_val, binvars):
+        (T, N) = active_set.shape
+        for t in range(T):
+            for i in range(N):
+                inactive_set_val[t, i] = binvars[t][i].getAttr('X')
 
     def _add_cvx_region_constant_constraint(self, qt, region_idx, t, model):
         Ai = self.AbCvx[region_idx][0]
