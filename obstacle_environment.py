@@ -44,18 +44,19 @@ B_MATS = [
 
 
 class ObstacleEnvironment2D:
-    def __init__(self, start, end, obstacles, cvx_regions):
+    def __init__(self, start, end, obstacles, a, b):
         self.start = start
         self.end = end
         self.obstacles = obstacles
-        self.cvx_regions = cvx_regions
+        self.a = a
+        self.b = b
 
     def get_cvx_ineqs(self):
         '''
         Converts convex sets from whatever format to Ax <= b
         :return: A and b Matrices
         '''
-        return (A_MATS, B_MATS)
+        return (self.a, self.b)
 
     def plot_path(self, waypoints, ax=None):
         '''
@@ -101,4 +102,4 @@ class ObstacleEnvironment2D:
         return ax
 
 
-START_ENV = ObstacleEnvironment2D(START, END, OBSTACLES, CVX_LINES)
+#START_ENV = ObstacleEnvironment2D(START, END, OBSTACLES, CVX_LINES)
