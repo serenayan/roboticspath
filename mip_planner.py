@@ -58,6 +58,7 @@ class MIPPlanner:
         '''
         m = gp.Model('Planner')
         m.Params.timeLimit = self.time_limit
+        m.Params.Presolve = self.presolve
         x, u, q, cvx_constraints, dyn_constraints \
             = (list(), list(), list(), list(), list())
         if active_set is not None:
@@ -127,9 +128,8 @@ class MIPPlanner:
 
         m.setObjective(sum([ut @ np.eye(2) @ ut for ut in u]), GRB.MINIMIZE)
         if initial_soln is not None:
-            (x_init, u_init)= initial_soln
+            (x_init, u_init) = initial_soln
             self._initialize_variables(x, u, x_init, u_init)
-        m.Params.Presolve = self.presolve
         m.optimize()
         if m.getAttr('Status') == GRB.INFEASIBLE:
             print('[WARNING] Model provided is infeasible. CVX regions '
@@ -147,8 +147,8 @@ class MIPPlanner:
         self.last_u = u
         self.last_m = m
         runtime = m.getAttr('Runtime')
-        xnp = [xt.getAttr('X') for xt in x]
-        unp = [ut.getAttr('X') for ut in u]
+        xnp = np.stack([xt.getAttr('X') for xt in x])
+        unp = np.stack([ut.getAttr('X') for ut in u])
         objective = m.getObjective().getValue()
         return xnp, unp, objective, active_set, inactive_set_val, runtime
 
