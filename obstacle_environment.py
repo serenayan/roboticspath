@@ -51,6 +51,9 @@ class ObstacleEnvironment2D:
         self.a = a
         self.b = b
 
+    def get_num_cvx(self):
+        return len(self.a)
+
     def get_cvx_ineqs(self):
         '''
         Converts convex sets from whatever format to Ax <= b
@@ -100,3 +103,6 @@ class ObstacleEnvironment2D:
         if show:
             plt.show()
         return ax
+
+#A default environment for testing purposes
+DEFAULT_ENV = ObstacleEnvironment2D(START, END, OBSTACLES, A_MATS, B_MATS)
