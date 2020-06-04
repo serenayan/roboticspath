@@ -5,9 +5,12 @@ import matplotlib.pyplot as plt
 import gurobipy as gp
 from gurobipy import GRB
 from mip_planner import MIPPlanner, TESTA, TESTB
-from obstacle_environment import START_ENV
+from obstacle_environment import ObstacleEnvironment2D, A_MATS, B_MATS, \
+    START, END, OBSTACLES
 from core.dynamics.linear_system_dynamics import LinearSystemDynamics
 from core.controllers import ConstantController
+
+START_ENV = ObstacleEnvironment2D(START, END, OBSTACLES, A_MATS, B_MATS)
 
 def test_dynamics_integration():
     dyn = LinearSystemDynamics(TESTA, TESTB)
@@ -112,3 +115,30 @@ def test_mip_initalization_default():
     np.testing.assert_allclose(inactive_set_val, is_val_inited)
     np.testing.assert_allclose([obj], [obj_inited])
     assert rt_inited < rt
+
+def test_new_gen_env():
+    from env_gen import load_folder_and_plot
+    from obstacle_environment import ObstacleEnvironment2D
+    from mip_planner import MIPPlanner, TESTA, TESTB
+    from core.dynamics.linear_system_dynamics import LinearSystemDynamics
+    import matplotlib.pyplot as plt
+
+    START = (10, 10, 50, 0)
+    END = (90, 90, 0, 0)
+    OBSTACLES = None
+    x_b = (0, 100)
+    y_b = (0, 100)
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    a, b = load_folder_and_plot(ax, (START[0], START[1]), (END[0], END[1]),
+                                "../envs/2", x_b, y_b)  # read and plot
+    START_ENV = ObstacleEnvironment2D(START, END, OBSTACLES, a, b)
+    planner = MIPPlanner(START_ENV, LinearSystemDynamics(TESTA, TESTB),
+                         T=100,
+                         h_k=0.01, presolve=0)
+    planner.set_optim_timelimit(90)
+    wp, _, _, _, _, _ = planner.optimize_path()
+    START_ENV.plot_path(wp, ax)
+    ax.set_xlim(-50, 200)
+    ax.set_ylim(-50, 200)
+    fig.show()

@@ -100,6 +100,3 @@ class ObstacleEnvironment2D:
         if show:
             plt.show()
         return ax
-
-
-#START_ENV = ObstacleEnvironment2D(START, END, OBSTACLES, CVX_LINES)
