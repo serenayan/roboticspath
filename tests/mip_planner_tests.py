@@ -25,7 +25,7 @@ def test_mip_planner():
     planner = MIPPlanner(START_ENV, LinearSystemDynamics(TESTA, TESTB),
                          T=200,
                          h_k=0.001)
-    x, u, _ = planner.optimize_path()
+    x, u, _, _, _, _ = planner.optimize_path()
 
     np.testing.assert_allclose(x[0], START_ENV.start)
     np.testing.assert_allclose(x[-1], START_ENV.end)
@@ -47,7 +47,7 @@ def test_mip_discrete_regions():
     active_set[120:, 3] = True
     active_set_vals = active_set
 
-    x, u, rt = planner.optimize_path(active_set, active_set_vals)
+    x, u, _, _, _, _ = planner.optimize_path(active_set, active_set_vals)
     np.testing.assert_allclose(x[0], START_ENV.start)
     np.testing.assert_allclose(x[-1], START_ENV.end)
     assert x[90][0] < 10 and x[90][1] > 80 # top left corner
@@ -55,3 +55,60 @@ def test_mip_discrete_regions():
     # plt.show()
     # pass
 
+def test_mip_initalization_given_active():
+    planner = MIPPlanner(START_ENV, LinearSystemDynamics(TESTA, TESTB),
+                         T=200,
+                         h_k=0.001)
+    n_regions = len(START_ENV.get_cvx_ineqs()[0])
+    n_timesteps = planner.T
+    active_set = np.zeros((n_timesteps, n_regions), dtype=bool)
+    active_set[:100, 0] = True
+    active_set[100:, 2] = True
+    active_set[120:, 3] = True
+    active_set_vals = active_set.copy()
+    x, u, obj, active_set, inactive_set_val, rt = planner.optimize_path(
+        active_set, active_set_vals)
+
+    x_inited, u_inited, obj_inited, as_inited,\
+    is_val_inited, rt_inited = \
+        planner.optimize_path(np.zeros_like(active_set, dtype=bool),
+                              inactive_set_val,
+                              initial_soln=(x, u))
+    # ax = START_ENV.plot_path(x)
+    # START_ENV.plot_path(x_inited, ax)
+    # plt.show()
+    np.testing.assert_allclose(np.stack(x), np.stack(x_inited))
+    np.testing.assert_allclose(np.stack(u), np.stack(u_inited))
+    np.testing.assert_allclose(inactive_set_val, is_val_inited)
+    np.testing.assert_allclose([obj], [obj_inited])
+    assert rt_inited < rt
+
+def test_mip_initalization_default():
+    planner = MIPPlanner(START_ENV, LinearSystemDynamics(TESTA, TESTB),
+                         T=200,
+                         h_k=0.001)
+    n_regions = len(START_ENV.get_cvx_ineqs()[0])
+    n_timesteps = planner.T
+    # active_set = np.zeros((n_timesteps, n_regions), dtype=bool)
+    # active_set[:100, 0] = True
+    # active_set[100:, 2] = True
+    # active_set[120:, 3] = True
+    # active_set_vals = active_set.copy()
+    active_set = None
+    active_set_vals = None
+    x, u, obj, active_set, inactive_set_val, rt = planner.optimize_path(
+        active_set, active_set_vals)
+
+    x_inited, u_inited, obj_inited, as_inited,\
+    is_val_inited, rt_inited = \
+        planner.optimize_path(np.zeros_like(active_set, dtype=bool),
+                              inactive_set_val,
+                              initial_soln=(x, u))
+    # ax = START_ENV.plot_path(x)
+    # START_ENV.plot_path(x_inited, ax)
+    # plt.show()
+    np.testing.assert_allclose(np.stack(x), np.stack(x_inited))
+    np.testing.assert_allclose(np.stack(u), np.stack(u_inited))
+    np.testing.assert_allclose(inactive_set_val, is_val_inited)
+    np.testing.assert_allclose([obj], [obj_inited])
+    assert rt_inited < rt
