@@ -12,7 +12,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.distributions import Categorical
-
+import torch.autograd
 
 parser = argparse.ArgumentParser(description='PyTorch REINFORCE example')
 parser.add_argument('--gamma', type=float, default=0.99, metavar='G',
@@ -25,7 +25,10 @@ parser.add_argument('--log-interval', type=int, default=10, metavar='N',
                     help='interval between training status logs (default: 10)')
 args = parser.parse_args()
 
+torch.autograd.set_detect_anomaly(True)
+
 T = 200 #number of timesteps
+NSection = 10
 obs_env = DEFAULT_ENV
 dyn = DEFAULT_DYN
 NCVX = obs_env.get_num_cvx()
@@ -41,7 +44,8 @@ torch.manual_seed(args.seed)
 class RandomPolicy(nn.Module):
     def __init__(self, ncvx):
         super(RandomPolicy, self).__init__()
-        self.delta_t = T // 10
+        self.delta_t = T // NSection
+        self.delta_t_i = 1
         self.ncvx = ncvx
         #AB to H
         self.Asl1 = nn.Linear(self.ncvx*4, 128)
@@ -50,11 +54,11 @@ class RandomPolicy(nn.Module):
         self.l2H = nn.Linear(256, 256)
         #start end to H
         self.sel1 = nn.Linear(8, 64)
-        self.l1H = nn.Linear(64)
+        self.l1H = nn.Linear(64, 64)
 
         #H to region decision
         self.Hd1 = nn.Linear(256 + 64, 64)
-        self.d1d2 = nn.Linear(64 + 5, 32)
+        self.d1d2 = nn.Linear(64 + self.ncvx, 32)
         self.d2F = nn.Linear(32, self.ncvx)
 
         self.saved_log_probs = []
@@ -71,10 +75,21 @@ class RandomPolicy(nn.Module):
         self.endR = point_in_which_regions(end.numpy(),
                                            obs_env.get_cvx_ineqs()[0],
                                            obs_env.get_cvx_ineqs()[1])[0]
-        self.G = generate_graph(obs_env.get_cvx_ineqs()[0],
-                       ob2s_env.get_cvx_ineqs()[1])
-        self.As.flatten()
-        self.bs.flatten()
+        self.G = generate_graph(
+                       obs_env.get_cvx_ineqs()[0],
+                       obs_env.get_cvx_ineqs()[1])
+
+
+    def _make_H(self):
+        l1A = nn.ReLU()(self.Asl1(self.As.flatten()))
+        l1b = nn.ReLU()(self.Bsl1(self.bs.flatten()))
+        l1 = torch.cat((l1A, l1b))
+        l2 = nn.ReLU()(self.l1l2(l1))
+        Hcvx = nn.ReLU()(self.l2H(l2))
+
+        l1pts = nn.ReLU()(self.sel1(torch.cat((self.start, self.end))))
+        Hpts = nn.ReLU()(self.l1H(l1pts))
+        return torch.cat([Hcvx, Hpts])
 
     def _adjacency_filter(self, node:int):
         nodes = [n for n in self.G.neighbors(node)]
@@ -82,6 +97,12 @@ class RandomPolicy(nn.Module):
         filter.scatter_(0, torch.tensor(nodes), 1.0)
         return filter
 
+    def _prev_x_to_next_x(self, x_prev):
+        d1 = nn.ReLU()(self.Hd1(self._make_H()))
+        d2 = nn.ReLU()(self.d1d2(torch.cat([d1, x_prev])))
+        f = nn.ReLU()(self.d2F(d2))
+        f = F.softmax(f, dim=0)
+        return f
     def forward(self, x, u, aset, iset_val):
         """
 
@@ -95,16 +116,45 @@ class RandomPolicy(nn.Module):
         # x = self.affine1(x)
         # x = self.dropout(x)
         # x = F.relu(x)
+        assert self.delta_t_i < NSection
+        if self.delta_t_i == 1:
+            iset_val = iset_val - 1
+            iset_val[:self.delta_t, self.startR] = 1
+            iset_val[-self.delta_t:,self.endR] = 1
+        iset_val[self.delta_t*self.delta_t_i:-self.delta_t] = 0
+        aset.fill_(0)
+        if self.delta_t_i < NSection -1:
+            aset[self.delta_t_i*self.delta_t: \
+                 self.delta_t_i*self.delta_t + self.delta_t] = 1
 
-        return F.softmax(aset, dim=1), torch.rand_like(iset_val)
+
+
+        for i in range(self.delta_t_i,NSection - 1):
+            f = self._prev_x_to_next_x(iset_val[self.delta_t * i -1])
+            if i == self.delta_t_i:
+                prev_filter = iset_val[self.delta_t*i-1]
+                n = torch.argmax(prev_filter).tolist()
+                filtered = f * self._adjacency_filter(n)
+                # assert torch.norm(filtered, 1) > 0
+                # filtered /= torch.norm(filtered, 1)
+                f = filtered
+            elif i == NSection -1:
+                last_filter = iset_val[-1]
+                n = torch.argmax(last_filter).tolist()
+                filtered = f * self._adjacency_filter(n)
+                # assert torch.norm(filtered, 1) > 0
+                # filtered /= torch.norm(filtered)
+                f = filtered
+            iset_val[self.delta_t*i:self.delta_t*(i+1)] = f
+
+        return aset, iset_val
 
 Abs = obs_env.get_cvx_ineqs()
 policy = RandomPolicy(NCVX)
 policy.setEnvParams(torch.stack([torch.from_numpy(A).float() for A in Abs[0]]),
                     torch.cat([torch.from_numpy(b).float() for b in Abs[1]]),
                     torch.FloatTensor(obs_env.start),
-                    torch.FloatTensor(obs_env.end),
-                    NCVX)
+                    torch.FloatTensor(obs_env.end))
 optimizer = optim.Adam(policy.parameters(), lr=1e-2)
 eps = np.finfo(np.float32).eps.item()
 
@@ -115,27 +165,21 @@ def select_action(state):
     aset = torch.from_numpy(state.aset).float()
     iset_val = torch.from_numpy(state.iset_val).float()
 
-    aset_dist, iset_val_dist = policy(x, u, aset, iset_val)
-    from torch.distributions import Bernoulli
-    aset_m = Bernoulli(aset_dist)
-    iset_val_m = Bernoulli(iset_val_dist)
-    aset_sample = aset_m.sample()
+    aset, iset_val_dist = policy(x, u, aset, iset_val)
+    deltat = policy.delta_t
+
+    iset_val_m = Categorical(iset_val_dist)
     iset_val_sample = iset_val_m.sample()
-    # aset_m.log_prob(new_aset)
-    # action = m.sample()
-    T = 200
-    pick_one_m = Categorical(torch.ones(4) * 0.25)
+    iset_val_one_hot = torch.zeros_like(iset_val)
+    for i in range(NSection):
+        iset_val_one_hot[i*deltat:i*deltat + deltat, iset_val_sample[i*deltat]] = 1
+        iset_val_sample[i*deltat:i*deltat + deltat] = iset_val_sample[i*deltat]
 
-    for t in range(200):
-        if not torch.any(aset_sample[t].bool()) and\
-            not torch.any(iset_val_sample[t].bool()):
-            iset_val_sample[t, pick_one_m.sample()] = 1
 
-    policy.saved_log_probs.append((aset_m.log_prob(aset_sample),
-                                   iset_val_m.log_prob(iset_val_sample)))
-    action = Action(aset_sample.bool().numpy(),
-                    iset_val_sample.bool().numpy())
-    # return action.item()
+    policy.saved_log_probs.append(iset_val_m.log_prob(iset_val_sample))
+    action = Action(aset.bool().numpy(),
+                    iset_val_one_hot.bool().numpy())
+    policy.delta_t_i += 1
     return action
 
 
@@ -147,13 +191,18 @@ def finish_episode():
         R = r + args.gamma * R
         returns.insert(0, R)
     returns = torch.tensor(returns)
-    returns = (returns - returns.mean()) / (returns.std() + eps)
+    if len(returns) > 1:
+        returns = (returns - returns.mean()) / (returns.std() + eps)
+    else:
+        returns = (returns - returns.mean()) / (eps)
     for log_prob, R in zip(policy.saved_log_probs, returns):
-        policy_loss.append(-torch.cat(log_prob) * R)
+        policy_loss.append(-log_prob * R)
     optimizer.zero_grad()
     policy_loss = torch.cat(policy_loss).sum()
     policy_loss.backward()
+    nn.utils.clip_grad_norm_(policy.parameters(), 0.01)
     optimizer.step()
+    policy.delta_t_i = 1
     del policy.rewards[:]
     del policy.saved_log_probs[:]
 
@@ -177,7 +226,7 @@ def main():
         if i_episode % args.log_interval == 0:
             print('Episode {}\tLast reward: {:.2f}\tAverage reward: {:.2f}'.format(
                   i_episode, ep_reward, running_reward))
-        if running_reward > env.spec.reward_threshold:
+        if running_reward > env.reward_threshold:
             print("Solved! Running reward is now {} and "
                   "the last episode runs to {} time steps!".format(running_reward, t))
             break
