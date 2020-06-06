@@ -30,7 +30,7 @@ class GymOptEnv:
             self.state.iset_val,
             (self.state.x, self.state.u))
         # After getting true value limit runtime
-        self.planner.set_optim_timelimit(5)
+        self.planner.set_optim_timelimit(1)
 
     def step(self, action: Action):
         '''
@@ -43,11 +43,19 @@ class GymOptEnv:
                                        (self.state.x, self.state.u))
 
         self.state = OptimState(x_new, u_new, aset, iset_val)
-        reward = obj_new - self.obj_true
+        if obj_new == float('Inf'):
+            #infeasible model. Bad Policy.
+            reward = -10*self.obj_true
+        else:
+            reward = self.obj_true - abs(obj_new)
         assert reward <= 0  # min obj <= obj
         # TODO: make tolerance reasonable
         done = np.isclose(obj_new, self.obj_true, rtol=0.01)
         return self.state, reward, done
+
+    def render(self):
+        #TODO: Implement this
+        pass
 
     def seed(self, s):
         self.random_seed = s

@@ -131,9 +131,11 @@ class MIPPlanner:
             (x_init, u_init) = initial_soln
             self._initialize_variables(x, u, x_init, u_init)
         m.optimize()
+        runtime = m.getAttr('Runtime')
+
         if m.getAttr('Status') == GRB.INFEASIBLE:
-            print('[WARNING] Model provided is infeasible. CVX regions '
-                  'probably wrong.')
+            print('[WARNING] Model provided is infeasible.')
+            return x_init, u_init, float('Inf'), active_set, inactive_set_val, runtime
         elif m.getAttr('Status') == GRB.INF_OR_UNBD:
             assert False, "[ERROR] Should never happen."
         elif m.getAttr('Status') == GRB.TIME_LIMIT:
@@ -146,7 +148,6 @@ class MIPPlanner:
         self.last_x = x
         self.last_u = u
         self.last_m = m
-        runtime = m.getAttr('Runtime')
         xnp = np.stack([xt.getAttr('X') for xt in x])
         unp = np.stack([ut.getAttr('X') for ut in u])
         objective = m.getObjective().getValue()
