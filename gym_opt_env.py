@@ -9,10 +9,10 @@ Action = namedtuple("Action", "aset, iset_val")
 
 
 class GymOptEnv:
-    def __init__(self):
-        self.planner = MIPPlanner(DEFAULT_ENV, LinearSystemDynamics(TESTA, TESTB))
-        self.T = self.planner.T
-        self.NCVX = len(self.planner.env.get_cvx_ineqs())
+    def __init__(self, planner, T, ncvx, seed):
+        self.planner = planner
+        self.T = T
+        self.NCVX = ncvx
         self.random_seed = 0
         self.state = OptimState(
             np.zeros((self.T, self.planner.dyn.n)),
@@ -31,6 +31,8 @@ class GymOptEnv:
             (self.state.x, self.state.u))
         # After getting true value limit runtime
         self.planner.set_optim_timelimit(1)
+        self.min_reward = -100
+        self.max_reward = 0
 
     def step(self, action: Action):
         '''
@@ -45,9 +47,9 @@ class GymOptEnv:
         self.state = OptimState(x_new, u_new, aset, iset_val)
         if obj_new == float('Inf'):
             #infeasible model. Bad Policy.
-            reward = -10*self.obj_true
+            reward = self.min_reward
         else:
-            reward = self.obj_true - abs(obj_new)
+            reward = np.clip((self.obj_true - abs(obj_new))/self.obj_true, -100)
         assert reward <= 0  # min obj <= obj
         # TODO: make tolerance reasonable
         done = np.isclose(obj_new, self.obj_true, rtol=0.01)

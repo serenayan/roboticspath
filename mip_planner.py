@@ -18,6 +18,7 @@ TESTB = np.array([
     [0, 1]
 ])
 
+DEFAULT_DYN = LinearSystemDynamics(TESTA, TESTB)
 
 class MIPPlanner:
 

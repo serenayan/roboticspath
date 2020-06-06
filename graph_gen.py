@@ -1,7 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from env_gen import load_folder_and_plot
-
+import networkx
+from networkx import Graph, all_simple_paths
 
 def point_in_which_regions(point, a, b):
     x = point[0]
@@ -42,8 +43,21 @@ def generate_graph(a, b):
                         dict[node2].append(node1)
     for reg in range(0, num_regions):
         dict[reg].sort()
-    return dict
+    G = Graph()
+    for k, v in dict.items():
+        for v_i in v:
+            G.add_edge(k, v_i)
+    return G
 
+def generate_path_list(a,b, start,end):
+    G = generate_graph(a,b)
+    start_node = point_in_which_regions(start, a, b)
+    end_node = point_in_which_regions(end, a, b)
+    assert len(start_node) > 0
+    assert len(end_node) > 0
+    #lets assume start and end only belong in one region for now
+    #TODO: add more regions if we can handle it
+    return [p for p in all_simple_paths(G, start_node[0], end_node[0])]
 
 if __name__ == "__main__":
     s = (10, 10)
@@ -54,4 +68,10 @@ if __name__ == "__main__":
     ax = fig.add_subplot(111)
     a, b = load_folder_and_plot(ax, s, e, "envs/2", x_b, y_b)  # read and plot
     fig.show()
-    print(generate_graph(a, b))
+    fig = plt.figure(2)
+    G = generate_graph(a,b)
+    start_node = point_in_which_regions(s, a, b)
+    end_node = point_in_which_regions(e, a, b)
+    networkx.draw(G)
+    fig.show()
+    print([p for p in all_simple_paths(G, start_node[0], end_node[0])])

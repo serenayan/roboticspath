@@ -1,6 +1,9 @@
 #taken from https://github.com/pytorch/examples/blob/master/reinforcement_learning/reinforce.py
 import argparse
 from gym_opt_env import GymOptEnv, Action, OptimState
+from graph_gen import generate_graph, point_in_which_regions
+from mip_planner import MIPPlanner, DEFAULT_DYN
+from obstacle_environment import DEFAULT_ENV
 import numpy as np
 from itertools import count
 
@@ -22,31 +25,86 @@ parser.add_argument('--log-interval', type=int, default=10, metavar='N',
                     help='interval between training status logs (default: 10)')
 args = parser.parse_args()
 
+T = 200 #number of timesteps
+obs_env = DEFAULT_ENV
+dyn = DEFAULT_DYN
+NCVX = obs_env.get_num_cvx()
+planner = MIPPlanner(obs_env, dyn, T, h_k=1e-3, presolve=0)
 
-env = GymOptEnv()
+env = GymOptEnv(planner, T, obs_env.get_num_cvx(), args.seed)
+
+
 env.seed(args.seed)
 torch.manual_seed(args.seed)
 
 
 class RandomPolicy(nn.Module):
-    def __init__(self):
+    def __init__(self, ncvx):
         super(RandomPolicy, self).__init__()
-        self.affine1 = nn.Linear(4, 128)
-        self.dropout = nn.Dropout(p=0.6)
-        self.affine2 = nn.Linear(4, 200)
+        self.delta_t = T // 10
+        self.ncvx = ncvx
+        #AB to H
+        self.Asl1 = nn.Linear(self.ncvx*4, 128)
+        self.Bsl1 = nn.Linear(self.ncvx*2, 64)
+        self.l1l2 = nn.Linear(128 + 64, 256)
+        self.l2H = nn.Linear(256, 256)
+        #start end to H
+        self.sel1 = nn.Linear(8, 64)
+        self.l1H = nn.Linear(64)
+
+        #H to region decision
+        self.Hd1 = nn.Linear(256 + 64, 64)
+        self.d1d2 = nn.Linear(64 + 5, 32)
+        self.d2F = nn.Linear(32, self.ncvx)
 
         self.saved_log_probs = []
         self.rewards = []
 
+    def setEnvParams(self, As, bs, start, end):
+        self.As = As
+        self.bs = bs
+        self.start = start
+        self.end = end
+        self.startR = point_in_which_regions(start.numpy(),
+                                             obs_env.get_cvx_ineqs()[0],
+                                             obs_env.get_cvx_ineqs()[1])[0]
+        self.endR = point_in_which_regions(end.numpy(),
+                                           obs_env.get_cvx_ineqs()[0],
+                                           obs_env.get_cvx_ineqs()[1])[0]
+        self.G = generate_graph(obs_env.get_cvx_ineqs()[0],
+                       ob2s_env.get_cvx_ineqs()[1])
+        self.As.flatten()
+        self.bs.flatten()
+
+    def _adjacency_filter(self, node:int):
+        nodes = [n for n in self.G.neighbors(node)]
+        filter = torch.zeros((self.ncvx))
+        filter.scatter_(0, torch.tensor(nodes), 1.0)
+        return filter
+
     def forward(self, x, u, aset, iset_val):
+        """
+
+        :param x:
+        :param u:
+        :param aset:
+        :param iset_val:
+        :return:
+        """
+
         # x = self.affine1(x)
         # x = self.dropout(x)
         # x = F.relu(x)
 
         return F.softmax(aset, dim=1), torch.rand_like(iset_val)
 
-
-policy = RandomPolicy()
+Abs = obs_env.get_cvx_ineqs()
+policy = RandomPolicy(NCVX)
+policy.setEnvParams(torch.stack([torch.from_numpy(A).float() for A in Abs[0]]),
+                    torch.cat([torch.from_numpy(b).float() for b in Abs[1]]),
+                    torch.FloatTensor(obs_env.start),
+                    torch.FloatTensor(obs_env.end),
+                    NCVX)
 optimizer = optim.Adam(policy.parameters(), lr=1e-2)
 eps = np.finfo(np.float32).eps.item()
 
