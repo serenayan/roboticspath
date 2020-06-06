@@ -15,8 +15,13 @@ def test_dynamics_integration():
     xs, us = dyn.simulate(DEFAULT_ENV.start, ctrl,
                           np.linspace(0, 10, 100))
     #enable to see plot of dynamics
-    #START_ENV.plot_path(xs)
-    # plt.show()
+    fig = plt.figure(1)
+    ax = fig.add_subplot()
+    DEFAULT_ENV.plot_path(xs, ax=ax)
+    ax.set_xlim(0, 100)
+    ax.set_ylim(0, 100)
+    plt.show()
+
 
 def grouped(iterable, n):
     return zip(*[iter(iterable)]*n)

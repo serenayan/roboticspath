@@ -241,7 +241,7 @@ if __name__ == "__main__":
     e = (90, 90)
     x_b = (0, 100)
     y_b = (0, 100)
-    gen_plot_write(s, e, "envs/7", x_b, y_b)  # generate and write
+    gen_plot_write(s, e, "envs/10", x_b, y_b)  # generate and write
     #fig = plt.figure()
     #ax = fig.add_subplot(111)
     #a, b = load_folder_and_plot(ax, s, e, "envs/4", x_b, y_b)  # read and plot
