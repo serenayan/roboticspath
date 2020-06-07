@@ -200,7 +200,7 @@ def finish_episode():
     optimizer.zero_grad()
     policy_loss = torch.cat(policy_loss).sum()
     policy_loss.backward()
-    nn.utils.clip_grad_norm_(policy.parameters(), 0.01)
+    nn.utils.clip_grad_norm_(policy.parameters(), 0.0001)
     optimizer.step()
     policy.delta_t_i = 1
     del policy.rewards[:]
