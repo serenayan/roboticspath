@@ -6,8 +6,10 @@ import matplotlib.pyplot as plt
 from graph_gen import generate_path_list
 import numpy as np
 
+import reinforce as rf
 
 np.random.seed(1)
+
 START = (10, 10, 0, 0)
 END = (90, 90, 0, 0)
 OBSTACLES = None
