@@ -10,6 +10,9 @@ def gen_line_2_points(x1, y1, x2=None, y2=None, rise=None, run=None, rev=False):
     if rise is None and run is None:
         rise = y2 - y1
         run = x2 - x1
+    if run < 0:
+        rise *= -1
+        run *= -1
     const = -rise * x1 + run * y1
     if rev:
         return [rise, -run], -const
@@ -39,13 +42,13 @@ def gen_triangle_2_points(x1, y1, x2, y2, x_bounds, y_bounds):
             new_x = x2 + np.random.randint(3, 7)
         else:
             new_x = x1 + np.random.randint(3, 7)
-        rev = True if float(-a_mid[0])/a_mid[1] > 0 else False
+        rev = True if float(-a_mid[0])/a_mid[1] < 0 else False
     else:
         if x2 < x1:
             new_x = x2 - np.random.randint(3, 7)
         else:
             new_x = x1 - np.random.randint(3, 7)
-        rev = False if float(-a_mid[0]) / a_mid[1] > 0 else True
+        rev = False if float(-a_mid[0]) / a_mid[1] < 0 else True
     new_y = (const - a_mid[0] * new_x) / a_mid[1]
     a_3, b_3 = gen_line_2_points(new_x, new_y, rise=a_mid[1], run=a_mid[0], rev=rev)
     constraints.append((a_3, b_3))
@@ -238,10 +241,10 @@ if __name__ == "__main__":
     e = (90, 90)
     x_b = (0, 100)
     y_b = (0, 100)
-    gen_plot_write(s, e, "envs/4", x_b, y_b)  # generate and write
+    gen_plot_write(s, e, "envs/10", x_b, y_b)  # generate and write
     #fig = plt.figure()
     #ax = fig.add_subplot(111)
-    #a, b = load_folder_and_plot(ax, s, e, "out", x_b, y_b)  # read and plot
+    #a, b = load_folder_and_plot(ax, s, e, "envs/4", x_b, y_b)  # read and plot
     #fig.show()
     #print(a)
     #print(b)
