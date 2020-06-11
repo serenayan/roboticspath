@@ -61,12 +61,6 @@ class RandomPolicy(nn.Module):
         self.d1d2 = nn.Linear(64 + self.ncvx, 32)
         self.d2F = nn.Linear(32, self.ncvx)
 
-        # self.main = nn.Sequential(
-        #     init_(nn.Conv2d(num_inputs, 32, 8*self.ncvx, stride=4)), nn.ReLU(),
-        #     init_(nn.Conv2d(32, 64, 4*self.ncvx, stride=2)), nn.ReLU(),
-        #     init_(nn.Conv2d(64, 32, 3*self.ncvx, stride=1)), nn.ReLU(), Flatten(),
-        #     init_(nn.Linear(32 * 7 * 7, hidden_size)), nn.ReLU())
-
         self.saved_log_probs = []
         self.rewards = []
 
