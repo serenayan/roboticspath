@@ -10,7 +10,7 @@ from graph_gen import generate_graph, point_in_which_regions
 from mip_planner import MIPPlanner, DEFAULT_DYN
 from obstacle_environment import DEFAULT_ENV
 
-T = 1000 # number of timesteps
+T = 500 # number of timesteps
 seed = 1
 obs_env = DEFAULT_ENV
 dyn = DEFAULT_DYN

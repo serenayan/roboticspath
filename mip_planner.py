@@ -165,9 +165,9 @@ class MIPPlanner:
         (T, N) = active_set.shape
         for t in range(T):
             for i in range(N):
-                print('binvars[t][i]-----------------------------')
-                print(binvars[t][i])
-                print('------------------------------------------')
+                # print('binvars[t][i]-----------------------------')
+                # print(binvars[t][i])
+                # print('------------------------------------------')
                 inactive_set_val[t, i] = binvars[t][i].getAttr('X')
 
     def _add_cvx_region_constant_constraint(self, qt, region_idx, t, model):
