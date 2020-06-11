@@ -70,7 +70,7 @@ class MIPPlanner:
                                  dtype=bool)
         if inactive_set_val is not None:
             assert inactive_set_val.dtype == bool, "inactive_set_value must be bools"
-            inactive_set_val.copy() #we change this later so make a copy
+            # inactive_set_val.copy() #we change this later so make a copy
         else:
             inactive_set_val = active_set.copy()
 

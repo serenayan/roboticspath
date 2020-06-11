@@ -32,7 +32,7 @@ NSection = 10
 obs_env = DEFAULT_ENV
 dyn = DEFAULT_DYN
 NCVX = obs_env.get_num_cvx()
-planner = MIPPlanner(obs_env, dyn, T, h_k=1e-3, presolve=0)
+planner = MIPPlanner(obs_env, dyn, T, h_k=1e-3, presolve=1)
 
 env = GymOptEnv(planner, T, obs_env.get_num_cvx(), args.seed)
 
@@ -162,7 +162,9 @@ eps = np.finfo(np.float32).eps.item()
 def select_action(state):
     x = torch.from_numpy(state.x)
     u = torch.from_numpy(state.u)
-    aset = torch.from_numpy(state.aset).float()
+    # print(state)
+    # print(state.aset)
+    # aset = torch.from_numpy(state.aset.float())
     iset_val = torch.from_numpy(state.iset_val).float()
 
     aset, iset_val_dist = policy(x, u, aset, iset_val)
@@ -211,9 +213,11 @@ def main():
     running_reward = 10
     for i_episode in count(1):
         state, ep_reward = env.reset(), 0
-        for t in range(1, 10000):  # Don't infinite loop while learning
+        for t in range(1, 100):  # Don't infinite loop while learning
             action = select_action(state)
+            print("action\n", action)
             state, reward, done = env.step(action)
+            print("state\n", state, "reward\n", reward)
             if args.render:
                 env.render()
             policy.rewards.append(reward)
