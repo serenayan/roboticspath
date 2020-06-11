@@ -63,7 +63,6 @@ class ObstacleEnvironment2D:
 
     def plot_path(self, waypoints, ax=None):
         '''
-
         :param ax:
         :param waypoints: List of 2D np.array()
         :return:
@@ -78,6 +77,9 @@ class ObstacleEnvironment2D:
             else:
                 vnorm = norm((value[2], value[3]))
                 vnorm = vnorm if vnorm > 0 else 1
+                print(value[0])
+                print(value[1])
+                print(vnorm)
                 ax.arrow(value[0], value[1], value[2]/vnorm, value[3]/vnorm,
                          width=0.5,
                          length_includes_head=True)

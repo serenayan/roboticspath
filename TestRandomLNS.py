@@ -1,3 +1,4 @@
+
 from env_gen import load_folder_and_plot
 from obstacle_environment import ObstacleEnvironment2D
 from mip_planner import MIPPlanner, TESTA, TESTB
@@ -67,6 +68,7 @@ for step in range(0, time_steps):
     except ValueError:
         pass
     runtime += r
+
 START_ENV.plot_path(wp, ax)
 print(ob)
 print(runtime)

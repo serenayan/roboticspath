@@ -44,7 +44,7 @@ class GymOptEnv:
         x_new, u_new, obj_new, aset, iset_val, rt = \
             self.planner.optimize_path(action.aset, action.iset_val,
                                        (self.state.x, self.state.u))
-
+        print(x_new)
         self.state = OptimState(x_new, u_new, aset, iset_val)
 
         if obj_new == float('Inf'):

@@ -143,6 +143,7 @@ class MIPPlanner:
         elif m.getAttr('Status') == GRB.TIME_LIMIT:
             print('[INFO] MIP time-limit termination.')
 
+        print(cvx_constraints)
         self._update_active_set(active_set,
                                 inactive_set_val,
                                 [c[0] for c in cvx_constraints])
@@ -164,6 +165,9 @@ class MIPPlanner:
         (T, N) = active_set.shape
         for t in range(T):
             for i in range(N):
+                print('binvars[t][i]-----------------------------')
+                print(binvars[t][i])
+                print('------------------------------------------')
                 inactive_set_val[t, i] = binvars[t][i].getAttr('X')
 
     def _add_cvx_region_constant_constraint(self, qt, region_idx, t, model):
